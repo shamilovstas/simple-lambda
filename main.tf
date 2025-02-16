@@ -1,10 +1,10 @@
 terraform {
   backend "s3" {
-    bucket = "simple-lambda-state-k2i5b8al201"
-    key = "state/terraform.tfstate"
-    region = "us-east-1"
+    bucket         = "simple-lambda-state-k2i5b8al201"
+    key            = "state/terraform.tfstate"
+    region         = "us-east-1"
     dynamodb_table = "simple-lambda-locks"
-    encrypt = true
+    encrypt        = true
   }
 }
 
@@ -19,8 +19,8 @@ data "archive_file" "lambda-payload" {
 }
 
 resource "aws_s3_bucket" "bucket" {
-    bucket = "testingapp-report-bucket-k2i5b8al201"
-    force_destroy = true
+  bucket        = "testingapp-report-bucket-k2i5b8al201"
+  force_destroy = true
 }
 
 data "aws_iam_policy_document" "assume_role" {
@@ -42,15 +42,15 @@ resource "aws_iam_role" "lambda_iam" {
 }
 
 data "aws_iam_policy_document" "allow_write_s3" {
-    statement {
-      effect = "Allow"
-      actions = ["s3:PutObject"]
-      resources = ["${aws_s3_bucket.bucket.arn}/receipts/*"]
-    }
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.bucket.arn}/receipts/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "allow_write_s3" {
-  role = aws_iam_role.lambda_iam.id
+  role   = aws_iam_role.lambda_iam.id
   policy = data.aws_iam_policy_document.allow_write_s3.json
 }
 
@@ -98,7 +98,7 @@ resource "aws_lambda_function" "simple-lambda" {
 
   environment {
     variables = {
-        RECEIPT_BUCKET = aws_s3_bucket.bucket.id
+      RECEIPT_BUCKET = aws_s3_bucket.bucket.id
     }
   }
 }
