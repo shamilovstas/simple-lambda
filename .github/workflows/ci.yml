@@ -6,6 +6,10 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
+env:
+  TF_LOG: INFO
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 jobs:
   test:
     name: Run tests
@@ -32,6 +36,18 @@ jobs:
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.10.5"
+          terraform_version: 1.10.5
+      - name: Terraform init
+        id: init
+        run: terraform init
+
+      - name: Terraform format
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Terraform validate
+        id: validate
+        run: terraform validate
+
       - name: Deploy
         run: make deploy
