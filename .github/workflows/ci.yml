@@ -1,0 +1,7 @@
+name: Deploy Simple lambda demo
+on: [push]
+jobs:
+  Run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make test
