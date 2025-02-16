@@ -1,5 +1,11 @@
-provider "aws" {
-  region = "us-east-1"
+terraform {
+  backend "s3" {
+    bucket = "simple-lambda-state-k2i5b8al201"
+    key = "state/terraform.tfstate"
+    region = "us-east-1"
+    dynamodb_table = "simple-lambda-locks"
+    encrypt = true
+  }
 }
 
 locals {
