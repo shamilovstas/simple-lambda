@@ -2,3 +2,4 @@
 bootstrap
 *.tfstate*
 .terraform/
+.idea/
