@@ -70,7 +70,7 @@ func handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.A
 	}
 	slog.Info("Successfully processed orders and stored receipt in bucket", slog.Int("orders", order.OrderId), slog.String("bucket", bucketName))
 	response := events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
+		StatusCode: http.StatusCreated,
 		Headers:    ApplicationJsonHeaders,
 		Body:       event.Body,
 	}
