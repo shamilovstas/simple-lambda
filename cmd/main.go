@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"lambda-test/orders"
+	"lambda-test/transport"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 
@@ -15,25 +17,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type Message struct {
-	Msg string `json:"message"`
-}
-
 type Headers map[string]string
-type Response struct {
-	StatusCode int     `json:"statusCode"`
-	Headers    Headers `json:"headers"`
-	Body       string  `json:"body"`
-}
-
-type Order struct {
-	OrderId int     `json:"order_id"`
-	Amount  float64 `json:"amount"`
-	Item    string  `json:"item"`
-}
 
 var (
-	s3Client *s3.Client
+	ApplicationJsonHeaders = Headers{"Content-Type": "application/json"}
+	s3Client               *s3.Client
 )
 
 func init() {
@@ -46,45 +34,47 @@ func init() {
 	s3Client = s3.NewFromConfig(cfg)
 }
 
-func handler(ctx context.Context, event events.APIGatewayProxyRequest) (*Response, error) {
-	var order Order
-	var response Response
-	response.Headers = Headers{"Content-Type": "application/json"}
-
+func handler(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	var order orders.Order
 	if err := json.Unmarshal([]byte(event.Body), &order); err != nil {
 		slog.Error("unmarshal json", slog.Any("error", err))
-		response.StatusCode = 422
-		message := Message{Msg: err.Error()}
-		msg, _ := json.Marshal(message)
-		response.Body = string(msg)
-		return &response, err
+		response := events.APIGatewayProxyResponse{
+			StatusCode: http.StatusUnprocessableEntity,
+			Body:       transport.NewMessage(err.Error()).String(),
+			Headers:    ApplicationJsonHeaders,
+		}
+		return response, nil
 	}
 
 	bucketName := os.Getenv("RECEIPT_BUCKET")
 	if bucketName == "" {
 		slog.Error("RECEIPT_BUCKET env variable is not set")
-
-		response.StatusCode = 401
-		message := Message{Msg: "RECEIPT_BUCKET env variable is not set"}
-		msg, _ := json.Marshal(message)
-		response.Body = string(msg)
-		return &response, errors.New("RECEIPT_BUCKET env variable is not set")
+		message := transport.NewMessage("RECEIPT_BUCKET env variable is not set").String()
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       message,
+			Headers:    ApplicationJsonHeaders,
+		}, nil
 	}
 
-	receiptContent := fmt.Sprintf("Order ID: %d\nAmount: $%.2f\nItem: %s", order.OrderId, order.Amount, order.Item)
+	receiptContent := order.Record()
 	key := fmt.Sprintf("receipts/%d.txt", order.OrderId)
 
 	if err := uploadReceipt(ctx, bucketName, key, receiptContent); err != nil {
-		response.StatusCode = 404
-		message := Message{Msg: err.Error()}
-		msg, _ := json.Marshal(message)
-		response.Body = string(msg)
-		return &response, err
+		message := transport.NewMessage(err.Error())
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusNotFound,
+			Body:       message.String(),
+			Headers:    ApplicationJsonHeaders,
+		}, nil
 	}
-	slog.Info("Successfully processed order and stored receipt in bucket", slog.Int("order", order.OrderId), slog.String("bucket", bucketName))
-	response.StatusCode = 201
-	response.Body = string(event.Body)
-	return &response, nil
+	slog.Info("Successfully processed orders and stored receipt in bucket", slog.Int("orders", order.OrderId), slog.String("bucket", bucketName))
+	response := events.APIGatewayProxyResponse{
+		StatusCode: http.StatusCreated,
+		Headers:    ApplicationJsonHeaders,
+		Body:       event.Body,
+	}
+	return response, nil
 }
 
 func uploadReceipt(ctx context.Context, bucketName, key, receiptContent string) error {
